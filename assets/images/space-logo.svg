@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <!-- Subtle paper texture via filter -->
+    <filter id="paper" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+      <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blended"/>
+      <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+    </filter>
+    <!-- Rounded rect clip -->
+    <clipPath id="roundedClip">
+      <rect x="20" y="20" width="460" height="460" rx="100" ry="100"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background card -->
+  <rect x="20" y="20" width="460" height="460" rx="100" ry="100" fill="#ede9e2" filter="url(#paper)"/>
+
+  <!-- Outer circle (brushstroke style, slightly imperfect via stroke-dasharray trick) -->
+  <circle cx="250" cy="260" r="168" fill="none" stroke="#6b8f71" stroke-width="6"
+    stroke-linecap="round"
+    stroke-dasharray="1050 10"
+    stroke-dashoffset="5"
+    opacity="0.85"/>
+  <!-- Second inner ring -->
+  <circle cx="250" cy="260" r="158" fill="none" stroke="#6b8f71" stroke-width="2.5"
+    opacity="0.5"/>
+
+  <!-- === LEAVES === -->
+  <!-- Left large leaf -->
+  <path d="M250,310 C210,285 165,260 155,235 C145,210 175,200 205,220 C225,233 245,265 250,310 Z"
+    fill="#6b8f71"/>
+  <!-- Right large leaf -->
+  <path d="M250,310 C290,285 335,260 345,235 C355,210 325,200 295,220 C275,233 255,265 250,310 Z"
+    fill="#6b8f71"/>
+
+  <!-- Small ground leaf left -->
+  <path d="M250,330 C235,325 205,322 195,330 C185,338 200,345 225,338 C237,334 247,332 250,330 Z"
+    fill="#6b8f71" opacity="0.75"/>
+  <!-- Small ground leaf right -->
+  <path d="M250,330 C265,325 295,322 305,330 C315,338 300,345 275,338 C263,334 253,332 250,330 Z"
+    fill="#6b8f71" opacity="0.75"/>
+
+  <!-- === HEART / STEM === -->
+  <!-- Left curl of heart -->
+  <path d="M250,290 C250,275 235,255 230,240 C225,225 232,215 240,218 C248,221 250,235 250,245"
+    fill="none" stroke="#4a4a4a" stroke-width="3" stroke-linecap="round"/>
+  <!-- Right curl of heart -->
+  <path d="M250,290 C250,275 265,255 270,240 C275,225 268,215 260,218 C252,221 250,235 250,245"
+    fill="none" stroke="#4a4a4a" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- === DOTS === -->
+  <!-- Pink dot (left, larger) -->
+  <circle cx="238" cy="198" r="10" fill="#c4a49a" opacity="0.85"/>
+  <!-- Small sage dot (right) -->
+  <circle cx="268" cy="193" r="5" fill="#6b8f71" opacity="0.7"/>
+</svg>

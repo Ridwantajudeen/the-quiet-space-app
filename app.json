@@ -4,12 +4,18 @@
     "slug": "the-quiet-space",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/quiet-logo.png",
     "scheme": "thequietspace",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "We use the microphone so you can record voice journal entries.",
+        "NSPhotoLibraryUsageDescription": "We use your photo library so you can choose a profile photo.",
+        "NSPhotoLibraryAddUsageDescription": "We save your selected profile photo to your library if you choose to.",
+        "NSUserNotificationUsageDescription": "We use notifications to send gentle reminders for mood check-ins and planner tasks."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +36,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/quiet-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -38,11 +44,19 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a9617acf-668e-4aaa-ba0b-77813fd0e0b3"
+      }
+    },
+    "owner": "ridwan-tajudeen"
   }
 }
