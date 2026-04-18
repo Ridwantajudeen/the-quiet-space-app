@@ -42,6 +42,8 @@ export default function SettingsScreen() {
   const [videoReminderEnabled, setVideoReminderEnabled] = useState(true);
   const [reminderTime, setReminderTime] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [videoDropTime, setVideoDropTime] = useState(null);
+  const [showVideoTimePicker, setShowVideoTimePicker] = useState(false);
 
   const parseTimeString = (timeStr) => {
     if (!timeStr) return null;
@@ -66,6 +68,14 @@ export default function SettingsScreen() {
     });
   }, [reminderTime]);
 
+  const videoTimeLabel = useMemo(() => {
+    if (!videoDropTime) return 'Set a time';
+    return videoDropTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [videoDropTime]);
+
   useEffect(() => {
     if (!profile) return;
     setRemindersEnabled(profile.reminders_enabled ?? true);
@@ -73,6 +83,8 @@ export default function SettingsScreen() {
     setPlannerReminderEnabled(profile.planner_reminder_enabled ?? true);
     setVideoReminderEnabled(profile.video_reminder_enabled ?? true);
     setReminderTime(parseTimeString(profile.reminder_time));
+    const drop = profile.video_drop_time || profile.reminder_time || null;
+    setVideoDropTime(parseTimeString(drop));
   }, [profile]);
 
   const handleSignOut = () => {
@@ -130,6 +142,7 @@ export default function SettingsScreen() {
         moodReminderEnabled,
         plannerReminderEnabled,
         videoReminderEnabled,
+        videoDropTime: videoDropTime ? formatTimeForStorage(videoDropTime) : null,
         reminderTime: reminderTime ? formatTimeForStorage(reminderTime) : null,
       });
 
@@ -140,6 +153,7 @@ export default function SettingsScreen() {
         moodReminderEnabled: updated.mood_reminder_enabled ?? moodReminderEnabled,
         plannerReminderEnabled: updated.planner_reminder_enabled ?? plannerReminderEnabled,
         videoReminderEnabled: updated.video_reminder_enabled ?? videoReminderEnabled,
+        videoDropTime: updated.video_drop_time || formatTimeForStorage(videoDropTime),
       });
 
       await syncDailyReminders({
@@ -244,6 +258,33 @@ export default function SettingsScreen() {
               thumbColor={videoReminderEnabled ? colors.primaryDark : colors.textMuted}
             />
           </View>
+
+          <TouchableOpacity
+            style={styles.timeRow}
+            onPress={() => setShowVideoTimePicker(true)}
+            disabled={!remindersEnabled}
+          >
+            <Body muted={!remindersEnabled}>Daily reset time</Body>
+            <Caption style={styles.timeValue}>{videoTimeLabel}</Caption>
+          </TouchableOpacity>
+
+          {showVideoTimePicker && (
+            <View style={styles.timePickerWrap}>
+              <DateTimePicker
+                value={videoDropTime || new Date()}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  if (Platform.OS !== 'ios') setShowVideoTimePicker(false);
+                  if (event?.type === 'dismissed') return;
+                  if (selectedDate) setVideoDropTime(selectedDate);
+                }}
+                themeVariant="light"
+                textColor={Platform.OS === 'ios' ? colors.textPrimary : undefined}
+                style={styles.timePicker}
+              />
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.timeRow}

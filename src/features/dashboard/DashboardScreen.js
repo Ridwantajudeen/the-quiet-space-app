@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
 import { useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 
 import SafeScreen from '../../components/SafeScreen';
 import { Heading, Body, Caption, CardTitle } from '../../components/Typography';
@@ -12,6 +13,7 @@ import MoodSelector from '../../components/MoodSelector';
 import { useUser } from '../../hooks/useUser';
 import { useAddMood } from '../../hooks/useMood';
 import { useTasks } from '../../hooks/useTasks';
+import { useSharedInvites } from '../../hooks/useNotifications';
 import { addPendingMood, getCachedMoods, saveCachedMoods } from '../../services/offlineMoods';
 import { getPendingTasks } from '../../services/offlineTasks';
 import { markMoodLoggedToday } from '../../services/reminderNotifications';
@@ -61,6 +63,7 @@ export default function DashboardScreen() {
   const { user } = useUser();
   const firstName = user?.firstName?.trim();
   const userId = user?.id;
+  const { data: invites = [] } = useSharedInvites(userId);
   const { mutateAsync, isPending } = useAddMood(userId);
   const { data: tasks = [] } = useTasks(userId);
   const [pendingTasks, setPendingTasks] = useState([]);
@@ -154,9 +157,18 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Heading style={styles.title}>
-          {`Welcome back${firstName ? ` ${firstName}` : ''}`}
-        </Heading>
+        <View style={styles.topRow}>
+          <Heading style={styles.title}>
+            {`Welcome back${firstName ? ` ${firstName}` : ''}`}
+          </Heading>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => router.push('/notifications')}
+          >
+            <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            {invites.length > 0 && <View style={styles.bellDot} />}
+          </TouchableOpacity>
+        </View>
         <Body muted style={styles.subtitle}>
           Take a soft moment for yourself today.
         </Body>
@@ -255,6 +267,30 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginBottom: spacing.lg,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bellButton: {
+    width: 36,
+    height: 36,
+    borderRadius: spacing.radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bellDot: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primaryDark,
   },
   card: {
     marginBottom: spacing.md,

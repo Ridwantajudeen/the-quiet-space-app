@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Video } from "expo-av";
+import { Audio, Video } from "expo-av";
 
 import SafeScreen from "../../components/SafeScreen";
 import { Heading, Body, Caption, CardTitle } from "../../components/Typography";
@@ -30,7 +30,7 @@ export default function DailyVideoScreen() {
   const isPremium = !!user?.isPremium;
   const userId = user?.id;
   const today = new Date().toISOString().split("T")[0];
-  const { data: video, isLoading, isError } = useDailyVideo(today);
+  const { data: video, isLoading, isError } = useDailyVideo(userId);
   const playerRef = useRef(null);
   const { data: profile } = useProfile(userId);
   const { mutateAsync, isPending: isSaving } = useUpdateProfile(userId);
@@ -43,6 +43,22 @@ export default function DailyVideoScreen() {
     if (!video) return false;
     return video.is_premium && !isPremium;
   }, [video, isPremium]);
+
+  useEffect(() => {
+    const enableAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (_) {
+        // ignore audio mode errors
+      }
+    };
+
+    enableAudio();
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
@@ -63,6 +79,8 @@ export default function DailyVideoScreen() {
     }
   };
 
+  const displayDate = video?.date || today;
+
   return (
     <SafeScreen>
       <View style={styles.headerRow}>
@@ -71,11 +89,11 @@ export default function DailyVideoScreen() {
         </TouchableOpacity>
         <Heading style={styles.title}>Daily reset</Heading>
       </View>
-      <Caption style={styles.date}>{formatLongDate(today)}</Caption>
+      <Caption style={styles.date}>{formatLongDate(displayDate)}</Caption>
 
       <Card style={styles.card}>
-        <CardTitle style={styles.cardTitle}>Today's reset</CardTitle>
-        {isLoading && <Body muted>Loading today's reset...</Body>}
+        <CardTitle style={styles.cardTitle}>Latest reset</CardTitle>
+        {isLoading && <Body muted>Loading your reset...</Body>}
         {isError && !isLoading && <Body muted>We could not load today's reset.</Body>}
         {!isLoading && !isError && !video && (
           <Body muted>No reset video yet. Check back later today.</Body>
@@ -98,6 +116,13 @@ export default function DailyVideoScreen() {
               useNativeControls
               shouldPlay={false}
               isLooping={false}
+              isMuted={false}
+              volume={1.0}
+              onLoad={() => {
+                if (playerRef.current?.setStatusAsync) {
+                  playerRef.current.setStatusAsync({ isMuted: false, volume: 1.0 });
+                }
+              }}
             />
             {video.title ? <Caption style={styles.videoTitle}>{video.title}</Caption> : null}
           </View>

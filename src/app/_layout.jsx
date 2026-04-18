@@ -9,11 +9,12 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
 import 'react-native-reanimated';
 
 import { UserProvider } from '../hooks/useUser';
 import { useUser } from '../hooks/useUser';
-import { useProfile } from '../hooks/useProfile';
+import { useProfile, useUpdateProfile } from '../hooks/useProfile';
 import {
   clearDailyReminders,
   clearVideoDropFlag,
@@ -59,6 +60,24 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
+  useEffect(() => {
+    const prepareAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (_) {
+        // ignore audio mode errors
+      }
+    };
+
+    prepareAudio();
+  }, []);
+
   if (!fontsLoaded) {
     return null;
   }
@@ -89,6 +108,7 @@ function ReminderSync() {
   const { user, isReady } = useUser();
   const userId = user?.id;
   const { data: profile } = useProfile(userId);
+  const { mutateAsync } = useUpdateProfile(userId);
 
   useEffect(() => {
     const run = async () => {
@@ -100,6 +120,15 @@ function ReminderSync() {
       }
       if (!profile) return;
 
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      if (timezone && profile.timezone !== timezone) {
+        try {
+          await mutateAsync({ timezone });
+        } catch (_) {
+          // ignore timezone update errors
+        }
+      }
+
       await syncDailyReminders({
         userId,
         remindersEnabled: profile.reminders_enabled ?? true,
@@ -110,15 +139,15 @@ function ReminderSync() {
 
       await registerPushToken({
         authToken: user?.token || null,
-        remindersEnabled: profile.reminders_enabled ?? true,
-        reminderTime: profile.reminder_time || null,
-        videoReminderEnabled: profile.video_reminder_enabled ?? true,
       });
 
       await notifyDailyVideoIfReady({
+        userId,
         isPremium: !!user?.isPremium,
         remindersEnabled: profile.reminders_enabled ?? true,
         videoReminderEnabled: profile.video_reminder_enabled ?? true,
+        videoDropTime: profile.video_drop_time || null,
+        reminderTime: profile.reminder_time || null,
       });
     };
 
@@ -131,6 +160,7 @@ function ReminderSync() {
     profile?.mood_reminder_enabled,
     profile?.planner_reminder_enabled,
     profile?.video_reminder_enabled,
+    profile?.timezone,
     user?.isPremium,
   ]);
 

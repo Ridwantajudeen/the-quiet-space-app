@@ -1,6 +1,6 @@
 import { apiRequest } from "../../services/api";
 
-export const getDailyVideo = async (date) => {
-  if (!date) return null;
-  return apiRequest(`/videos?date=${encodeURIComponent(date)}`);
+export const getAvailableVideo = async (userId) => {
+  if (!userId) return null;
+  return apiRequest(`/videos/available?userId=${encodeURIComponent(userId)}`);
 };

@@ -14,7 +14,7 @@
         "NSMicrophoneUsageDescription": "We use the microphone so you can record voice journal entries.",
         "NSPhotoLibraryUsageDescription": "We use your photo library so you can choose a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "We save your selected profile photo to your library if you choose to.",
-        "NSUserNotificationUsageDescription": "We use notifications to send gentle reminders for mood check-ins and planner tasks."
+        "NSUserNotificationUsageDescription": "We use notifications to send gentle reminders, shared space invites, and daily reset updates."
       }
     },
     "android": {

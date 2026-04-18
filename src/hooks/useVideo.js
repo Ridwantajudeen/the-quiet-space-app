@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { getDailyVideo } from "../features/video/videoService";
+import { getAvailableVideo } from "../features/video/videoService";
 
-export const useDailyVideo = (date) => {
+export const useDailyVideo = (userId) => {
   return useQuery({
-    queryKey: ["daily-video", date],
-    queryFn: () => getDailyVideo(date),
-    enabled: !!date,
+    queryKey: ["daily-video", userId],
+    queryFn: () => getAvailableVideo(userId),
+    enabled: !!userId,
   });
 };

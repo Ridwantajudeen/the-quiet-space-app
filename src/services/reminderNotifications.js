@@ -58,7 +58,7 @@ export const ensureReminderNotificationsReady = async () => {
   const current = await Notifications.getPermissionsAsync();
   if (current.status !== 'granted') {
     const allow = await confirmPermission(
-      'We use notifications to send gentle reminders for mood check-ins and your planner.'
+      'We use notifications to send gentle reminders, shared space invites, and daily reset updates.'
     );
     if (!allow) return false;
   }
@@ -187,13 +187,8 @@ const saveStoredPushToken = async (token) => {
   await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
 };
 
-export const registerPushToken = async ({
-  authToken,
-  remindersEnabled,
-  reminderTime,
-  videoReminderEnabled,
-}) => {
-  if (!authToken || !remindersEnabled || !reminderTime || !videoReminderEnabled) return;
+export const registerPushToken = async ({ authToken }) => {
+  if (!authToken) return;
   const hasPermission = await ensureReminderNotificationsReady();
   if (!hasPermission) return;
 
@@ -223,14 +218,27 @@ export const registerPushToken = async ({
 };
 
 export const notifyDailyVideoIfReady = async ({
+  userId,
   isPremium,
   remindersEnabled,
   videoReminderEnabled,
+  videoDropTime,
+  reminderTime,
 }) => {
   if (!remindersEnabled || !videoReminderEnabled) return;
   const storedToken = await getStoredPushToken();
   if (storedToken) return;
-  const today = new Date().toISOString().split('T')[0];
+  if (!userId) return;
+
+  const now = new Date();
+  const localDate = now.toISOString().split('T')[0];
+  const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(
+    now.getMinutes()
+  ).padStart(2, '0')}`;
+  const dropTime = videoDropTime || reminderTime || '08:00';
+  if (localTime < dropTime) return;
+
+  const today = localDate;
   const lastNotified = await loadVideoFlag();
   if (lastNotified === today) return;
 
