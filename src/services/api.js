@@ -1,4 +1,6 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+import { authorizedFetch } from './authSession';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://the-quiet-space-backend.onrender.com';
 
 const buildUrl = (path) => `${API_URL}${path}`;
 
@@ -11,7 +13,7 @@ export const apiRequest = async (path, { method = 'GET', body, token } = {}) => 
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(buildUrl(path), {
+  const response = await authorizedFetch(buildUrl(path), {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,

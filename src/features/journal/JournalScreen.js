@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
@@ -8,17 +8,15 @@ import SafeScreen from '../../components/SafeScreen';
 import { Heading, Body, Caption, CardTitle } from '../../components/Typography';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
-import VoicePlayer from '../../components/VoicePlayer';
 import theme from '../../theme';
 import { useJournal, useDeleteJournalEntry } from '../../hooks/useJournal';
 import { useUser } from '../../hooks/useUser';
 import {
   getPendingEntries,
   getPendingUpdates,
-  syncPendingEntries,
-  syncPendingUpdates,
   removePendingEntry,
 } from '../../services/offlineJournal';
+import { syncOfflineData } from '../../services/offlineSync';
 
 const { colors, spacing } = theme;
 
@@ -50,30 +48,28 @@ export default function JournalScreen() {
   const [pendingEntries, setPendingEntries] = useState([]);
   const [pendingUpdates, setPendingUpdates] = useState([]);
 
-  const loadPending = async () => {
+  const loadPending = useCallback(async () => {
     if (!userId) return;
     const pending = await getPendingEntries(userId);
     setPendingEntries(pending);
     const updates = await getPendingUpdates(userId);
     setPendingUpdates(updates);
-  };
+  }, [userId]);
 
   useEffect(() => {
     loadPending();
-  }, [userId]);
+  }, [loadPending]);
 
   useEffect(() => {
     if (!userId) return;
     const unsubscribe = NetInfo.addEventListener(async (state) => {
       if (state.isConnected) {
-        await syncPendingEntries(userId);
-        await syncPendingUpdates(userId);
+        await syncOfflineData({ userId, queryClient });
         await loadPending();
-        queryClient.invalidateQueries(['journal', userId]);
       }
     });
     return unsubscribe;
-  }, [userId]);
+  }, [userId, loadPending, queryClient]);
 
   const combinedEntries = useMemo(() => {
     const pending = pendingEntries.map((entry) => ({
@@ -143,7 +139,7 @@ export default function JournalScreen() {
   };
 
   return (
-    <SafeScreen contentStyle={styles.screen}>
+    <SafeScreen contentStyle={styles.screen} dismissKeyboard={false}>
       <View style={styles.headerRow}>
         <Heading style={styles.title}>Journal</Heading>
         <Button size="sm" onPress={() => router.push('/(tabs)/journal/create')}>
@@ -153,6 +149,24 @@ export default function JournalScreen() {
       <Body muted style={styles.subtitle}>
         Write what you need to release today.
       </Body>
+
+      <Card style={styles.sharedCard}>
+        <View style={styles.sharedRow}>
+          <View style={styles.sharedText}>
+            <CardTitle>Shared space</CardTitle>
+            <Body muted style={styles.sharedCaption}>
+              Open your shared support space for group notes and tasks.
+            </Body>
+          </View>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => router.push('/(tabs)/planner/shared')}
+          >
+            Open
+          </Button>
+        </View>
+      </Card>
 
       {isLoading && <Body muted>Loading your entries...</Body>}
       {isError && (
@@ -167,6 +181,7 @@ export default function JournalScreen() {
       )}
 
       <FlatList
+        style={styles.listRoot}
         data={combinedEntries}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -220,6 +235,9 @@ const styles = StyleSheet.create({
   screen: {
     paddingTop: spacing.xl,
   },
+  listRoot: {
+    flex: 1,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -231,6 +249,22 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginBottom: spacing.lg,
+  },
+  sharedCard: {
+    marginBottom: spacing.md,
+  },
+  sharedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.base,
+  },
+  sharedText: {
+    flex: 1,
+  },
+  sharedCaption: {
+    marginTop: spacing.xs,
+    color: colors.textSecondary,
   },
   list: {
     paddingBottom: spacing.lg,

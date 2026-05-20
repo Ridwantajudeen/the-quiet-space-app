@@ -152,7 +152,7 @@ export default function DashboardScreen() {
   }, [combinedTasks]);
 
   return (
-    <SafeScreen>
+    <SafeScreen dismissKeyboard={false}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -181,12 +181,41 @@ export default function DashboardScreen() {
             style={styles.cardButton}
             onPress={() => router.push('/(tabs)/video')}
           >
-            View today's reset
+            View today&apos;s reset
+          </Button>
+        </Card>
+
+        <Card style={[styles.card, styles.featuredCard]}>
+          <View style={styles.featuredTopRow}>
+            <View style={styles.featuredIconWrap}>
+              <Ionicons name="people-outline" size={18} color={colors.primaryDark} />
+            </View>
+            <View style={styles.premiumPill}>
+              <Caption style={styles.premiumPillText}>Premium</Caption>
+            </View>
+          </View>
+          <CardTitle style={styles.featuredTitle}>Shared space</CardTitle>
+          <Body style={styles.featuredBody}>
+            Keep shared tasks, support notes, and check-ins in one calm place. Open Premium here
+            too.
+          </Body>
+          <Button
+            style={styles.cardButton}
+            onPress={() => router.push('/premium')}
+          >
+            View Premium
+          </Button>
+          <Button
+            variant="outline"
+            style={styles.cardButton}
+            onPress={() => router.push('/(tabs)/planner/shared')}
+          >
+            Open shared space
           </Button>
         </Card>
 
         <Card style={styles.card}>
-          <CardTitle style={styles.cardTitle}>Today's mood</CardTitle>
+          <CardTitle style={styles.cardTitle}>Today&apos;s mood</CardTitle>
           <Caption style={styles.caption}>How are you feeling right now?</Caption>
           <MoodSelector value={todayMood} onChange={setTodayMood} />
           {moodError ? <Caption style={styles.error}>{moodError}</Caption> : null}
@@ -224,7 +253,7 @@ export default function DashboardScreen() {
           <CardTitle style={styles.cardTitle}>Upcoming tasks</CardTitle>
           {upcomingTasks.length === 0 && (
             <Body muted style={styles.caption}>
-              You're clear for now. Add something when you're ready.
+            You&apos;re clear for now. Add something when you&apos;re ready.
             </Body>
           )}
           {upcomingTasks.map((task) => (
@@ -250,7 +279,7 @@ export default function DashboardScreen() {
         </Card>
 
         <View style={styles.footer}>
-          <Caption style={styles.footerText}>You're doing enough, exactly as you are.</Caption>
+          <Caption style={styles.footerText}>You&apos;re doing enough, exactly as you are.</Caption>
         </View>
       </ScrollView>
     </SafeScreen>
@@ -294,6 +323,45 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: spacing.md,
+  },
+  featuredCard: {
+    borderColor: colors.primaryLight,
+    backgroundColor: colors.primaryLight,
+  },
+  featuredTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  featuredIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: spacing.radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  premiumPill: {
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    borderRadius: spacing.radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  premiumPillText: {
+    color: colors.primaryDark,
+  },
+  featuredTitle: {
+    marginBottom: spacing.xs,
+    color: colors.textPrimary,
+  },
+  featuredBody: {
+    marginBottom: spacing.sm,
+    color: colors.textSecondary,
   },
   cardTitle: {
     marginBottom: spacing.xs,

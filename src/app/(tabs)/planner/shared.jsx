@@ -1,3 +1,3 @@
-import SharedSpaceScreen from '../../../features/planner/SharedSpaceScreen';
+import SharedSpaceListScreen from '../../../features/planner/SharedSpaceListScreen';
 
-export default SharedSpaceScreen;
+export default SharedSpaceListScreen;

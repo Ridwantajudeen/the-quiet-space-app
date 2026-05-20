@@ -1,13 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
 import { Alert, Platform } from 'react-native';
 import { apiRequest } from './api';
+import {
+  clearNotificationPromptSuppression,
+  shouldSuppressNotificationPrompts,
+  suppressNotificationPrompts,
+} from './notificationPromptState';
 
 const STORAGE_KEY = 'daily_reminder_map_v1';
 const VIDEO_NOTIFY_KEY = 'daily_video_notify_v1';
 const PUSH_TOKEN_KEY = 'expo_push_token_v1';
 const MOOD_WINDOW_DAYS = 30;
+const PUSH_NOTIFICATIONS_ENABLED = false;
 
 const loadState = async () => {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -54,16 +59,49 @@ const normalizeState = (state) => {
   };
 };
 
-export const ensureReminderNotificationsReady = async () => {
+export const ensureReminderNotificationsReady = async ({ prompt = false } = {}) => {
   const current = await Notifications.getPermissionsAsync();
-  if (current.status !== 'granted') {
-    const allow = await confirmPermission(
-      'We use notifications to send gentle reminders, shared space invites, and daily reset updates.'
-    );
-    if (!allow) return false;
+  if (current.status === 'granted') {
+    await clearNotificationPromptSuppression();
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('reminders', {
+        name: 'Reminders',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#D8A7B1',
+      });
+    }
+    return true;
+  }
+
+  if (current.status === 'denied') {
+    await suppressNotificationPrompts();
+    return false;
+  }
+
+  if (current.status !== 'undetermined' || !prompt) {
+    return false;
+  }
+
+  const suppressed = await shouldSuppressNotificationPrompts();
+  if (suppressed) {
+    return false;
+  }
+
+  const allow = await confirmPermission(
+    'We use notifications to send gentle reminders, shared space invites, and daily reset updates.'
+  );
+  if (!allow) {
+    await suppressNotificationPrompts();
+    return false;
   }
 
   const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    await suppressNotificationPrompts();
+    return false;
+  }
+  await clearNotificationPromptSuppression();
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('reminders', {
       name: 'Reminders',
@@ -72,7 +110,69 @@ export const ensureReminderNotificationsReady = async () => {
       lightColor: '#D8A7B1',
     });
   }
-  return status === 'granted';
+  return true;
+};
+
+export const hasReminderNotificationPermission = async () => {
+  const current = await Notifications.getPermissionsAsync();
+  if (current.status !== 'granted') {
+    return false;
+  }
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('reminders', {
+      name: 'Reminders',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#D8A7B1',
+    });
+  }
+  return true;
+};
+
+export const requestReminderNotificationPermission = async () => {
+  const current = await Notifications.getPermissionsAsync();
+  if (current.status === 'granted') {
+    await clearNotificationPromptSuppression();
+    return hasReminderNotificationPermission();
+  }
+
+  if (current.status === 'denied') {
+    await suppressNotificationPrompts();
+    return false;
+  }
+
+  if (current.status !== 'undetermined') {
+    return false;
+  }
+
+  const suppressed = await shouldSuppressNotificationPrompts();
+  if (suppressed) {
+    return false;
+  }
+
+  const allow = await confirmPermission(
+    'We use notifications to send gentle reminders, shared space invites, and daily reset updates.'
+  );
+  if (!allow) {
+    await suppressNotificationPrompts();
+    return false;
+  }
+
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    await suppressNotificationPrompts();
+    return false;
+  }
+  await clearNotificationPromptSuppression();
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('reminders', {
+      name: 'Reminders',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#D8A7B1',
+    });
+  }
+  return true;
 };
 
 const scheduleDaily = async ({ title, body, hour, minute }) => {
@@ -188,33 +288,40 @@ const saveStoredPushToken = async (token) => {
 };
 
 export const registerPushToken = async ({ authToken }) => {
+  if (!PUSH_NOTIFICATIONS_ENABLED) {
+    await AsyncStorage.removeItem(PUSH_TOKEN_KEY);
+    return;
+  }
   if (!authToken) return;
-  const hasPermission = await ensureReminderNotificationsReady();
+  const hasPermission = await hasReminderNotificationPermission();
   if (!hasPermission) return;
 
-  const projectId =
-    Constants?.expoConfig?.extra?.eas?.projectId ||
-    Constants?.easConfig?.projectId;
-
-  const tokenResponse = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined
-  );
-  const expoPushToken = tokenResponse?.data;
+  let expoPushToken = null;
+  try {
+    const tokenResponse = await Notifications.getExpoPushTokenAsync();
+    expoPushToken = tokenResponse?.data || null;
+  } catch (_) {
+    return;
+  }
   if (!expoPushToken) return;
 
   const storedToken = await getStoredPushToken();
   if (storedToken === expoPushToken) return;
 
-  await apiRequest('/notifications/register', {
-    method: 'POST',
-    body: {
-      expoPushToken,
-      platform: Platform.OS,
-    },
-    token: authToken,
-  });
+  try {
+    await apiRequest('/notifications/register', {
+      method: 'POST',
+      body: {
+        expoPushToken,
+        platform: Platform.OS,
+      },
+      token: authToken,
+    });
 
-  await saveStoredPushToken(expoPushToken);
+    await saveStoredPushToken(expoPushToken);
+  } catch (_) {
+    // Push token registration should never block the rest of the app.
+  }
 };
 
 export const notifyDailyVideoIfReady = async ({
@@ -227,7 +334,7 @@ export const notifyDailyVideoIfReady = async ({
 }) => {
   if (!remindersEnabled || !videoReminderEnabled) return;
   const storedToken = await getStoredPushToken();
-  if (storedToken) return;
+  if (PUSH_NOTIFICATIONS_ENABLED && storedToken) return;
   if (!userId) return;
 
   const now = new Date();
@@ -252,7 +359,7 @@ export const notifyDailyVideoIfReady = async ({
   if (!video) return;
   if (video.is_premium && !isPremium) return;
 
-  const hasPermission = await ensureReminderNotificationsReady();
+  const hasPermission = await hasReminderNotificationPermission();
   if (!hasPermission) return;
 
   await Notifications.scheduleNotificationAsync({
@@ -305,7 +412,7 @@ export const syncDailyReminders = async ({
     return;
   }
 
-  const hasPermission = await ensureReminderNotificationsReady();
+  const hasPermission = await hasReminderNotificationPermission();
   if (!hasPermission) return;
 
   const state = normalizeState(await loadState());

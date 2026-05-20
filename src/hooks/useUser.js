@@ -1,5 +1,11 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  clearCurrentAuthSession,
+  saveStoredUser,
+  setCurrentAuthSession,
+  setSessionExpiredListener,
+} from '../services/authSession';
 
 const STORAGE_KEY = 'quiet-space-user';
 
@@ -18,7 +24,12 @@ export const UserProvider = ({ children }) => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
-          setUser(JSON.parse(raw));
+          const nextUser = JSON.parse(raw);
+          setUser(nextUser);
+          setCurrentAuthSession({
+            token: nextUser?.token || null,
+            refreshToken: nextUser?.refreshToken || null,
+          });
         }
       } catch (_) {
         // ignore storage errors
@@ -29,26 +40,35 @@ export const UserProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  const persistUser = async (nextUser) => {
+  const persistUser = useCallback(async (nextUser) => {
     try {
       if (!nextUser) {
+        clearCurrentAuthSession();
         await AsyncStorage.removeItem(STORAGE_KEY);
       } else {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+        await saveStoredUser(nextUser);
       }
     } catch (_) {
       // ignore storage errors
     }
-  };
+  }, []);
 
-  const setUserAndPersist = (nextUser) => {
+  const setUserAndPersist = useCallback((nextUser) => {
     setUser(nextUser);
     persistUser(nextUser);
-  };
+  }, [persistUser]);
+
+  useEffect(() => {
+    const unsubscribe = setSessionExpiredListener(() => {
+      setUserAndPersist(null);
+    });
+
+    return unsubscribe;
+  }, [setUserAndPersist]);
 
   const value = useMemo(
     () => ({ user, setUser: setUserAndPersist, isReady }),
-    [user, isReady]
+    [user, isReady, setUserAndPersist]
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

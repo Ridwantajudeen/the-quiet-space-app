@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -31,7 +31,11 @@ export default function LoginScreen() {
     try {
       const result = await login({ email, password });
       if (result?.user) {
-        setUser({ ...result.user, token: result.token || null });
+        setUser({
+          ...result.user,
+          token: result.token || null,
+          refreshToken: result.refreshToken || null,
+        });
       }
       router.replace('/(tabs)');
     } catch (err) {
@@ -120,7 +124,7 @@ export default function LoginScreen() {
         </Card>
 
         <View style={styles.footer}>
-          <Caption>Don't have an account?</Caption>
+          <Caption>Don&apos;t have an account?</Caption>
           <Button variant="ghost" onPress={() => router.push('/(auth)/signup')}>
             Create one
           </Button>

@@ -9,14 +9,25 @@
 //   <VoiceRecorder userId={userId} onRecordingComplete={({ url, localUri }) => {}} />
 
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, View, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Animated, Easing } from "react-native";
+import {
+  Alert,
+  AppState,
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Animated,
+  Easing,
+} from "react-native";
 import { Audio } from "expo-av";
 import NetInfo from "@react-native-community/netinfo";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import theme from "../theme";
+import { authorizedFetch } from "../services/authSession";
 
 const { colors, spacing, typography } = theme;
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000";
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "https://the-quiet-space-backend.onrender.com";
 
 const confirmPermission = (message) =>
   new Promise((resolve) => {
@@ -83,6 +94,14 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
 
   const startRecording = async () => {
     try {
+      if (AppState.currentState !== "active") {
+        Alert.alert(
+          "Recording not ready",
+          "Please return to the app and try recording again."
+        );
+        return;
+      }
+
       const permission = await Audio.getPermissionsAsync();
       if (!permission.granted) {
         const allow = await confirmPermission(
@@ -93,6 +112,16 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
 
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) return;
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      if (AppState.currentState !== "active") {
+        Alert.alert(
+          "Recording not ready",
+          "Please keep the app open while we start the microphone."
+        );
+        return;
+      }
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -106,8 +135,8 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
       setRecording(recording);
       setIsRecording(true);
       setSavedOffline(false);
-    } catch (err) {
-      console.error("Failed to start recording:", err);
+    } catch (_err) {
+      console.error("Failed to start recording:", _err);
     }
   };
 
@@ -119,8 +148,8 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
       setRecordedUri(uri);
       setRecording(null);
       await handleRecording(uri);
-    } catch (err) {
-      console.error("Failed to stop recording:", err);
+    } catch (_err) {
+      console.error("Failed to stop recording:", _err);
     }
   };
 
@@ -147,8 +176,8 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
         setSavedOffline(true);
         onRecordingComplete({ url: null, localUri });
         return;
-      } catch (err) {
-        console.error("Failed to cache recording:", err);
+      } catch (_err) {
+        console.error("Failed to cache recording:", _err);
         return;
       }
     }
@@ -156,7 +185,7 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
     try {
       await uploadRecording(uri);
       setSavedOffline(false);
-    } catch (err) {
+    } catch (_err) {
       try {
         const localUri = await cacheRecording(uri);
         setRecordedUri(localUri);
@@ -184,7 +213,7 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
         formData.append("userId", userId);
       }
 
-      const response = await fetch(`${API_URL}/uploads/voice`, {
+      const response = await authorizedFetch(`${API_URL}/uploads/voice`, {
         method: "POST",
         body: formData,
       });
@@ -195,9 +224,9 @@ const VoiceRecorder = ({ onRecordingComplete, userId }) => {
       }
 
       onRecordingComplete({ url: data.url, localUri: null });
-    } catch (err) {
-      console.error("Upload failed:", err);
-      throw err;
+    } catch (_err) {
+      console.error("Upload failed:", _err);
+      throw _err;
     } finally {
       setUploading(false);
     }

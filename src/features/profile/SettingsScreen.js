@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useQueryClient } from '@tanstack/react-query';
 
 import SafeScreen from '../../components/SafeScreen';
 import { Heading, Body, Caption, CardTitle } from '../../components/Typography';
@@ -21,7 +22,11 @@ import { useUser } from '../../hooks/useUser';
 import { useProfile, useUpdateProfile } from '../../hooks/useProfile';
 import { SUPPORT_EMAIL, PRIVACY_URL, TERMS_URL } from '../../constants/support';
 import { deleteAccount, requestPasswordReset } from './profileService';
-import { syncDailyReminders } from '../../services/reminderNotifications';
+import {
+  requestReminderNotificationPermission,
+  syncDailyReminders,
+} from '../../services/reminderNotifications';
+import { syncOfflineData } from '../../services/offlineSync';
 import theme from '../../theme';
 
 const { colors, spacing } = theme;
@@ -30,11 +35,14 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, setUser } = useUser();
   const userId = user?.id;
+  const queryClient = useQueryClient();
   const { data: profile } = useProfile(userId);
   const { mutateAsync, isPending } = useUpdateProfile(userId);
   const [deleting, setDeleting] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState('');
   const [prefMessage, setPrefMessage] = useState('');
+  const [syncMessage, setSyncMessage] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const [resetMessage, setResetMessage] = useState('');
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [moodReminderEnabled, setMoodReminderEnabled] = useState(true);
@@ -156,6 +164,12 @@ export default function SettingsScreen() {
         videoDropTime: updated.video_drop_time || formatTimeForStorage(videoDropTime),
       });
 
+      if ((updated.reminders_enabled ?? remindersEnabled) && (
+        moodReminderEnabled || plannerReminderEnabled || videoReminderEnabled
+      )) {
+        await requestReminderNotificationPermission();
+      }
+
       await syncDailyReminders({
         userId,
         remindersEnabled: updated.reminders_enabled ?? remindersEnabled,
@@ -181,6 +195,29 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleManualSync = async () => {
+    if (!userId) return;
+    setSyncing(true);
+    setSyncMessage('');
+
+    try {
+      const result = await syncOfflineData({ userId, queryClient });
+      if (!result?.online) {
+        setSyncMessage("You're offline right now. We'll try again when you reconnect.");
+      } else if ((result.syncedTotal || 0) > 0) {
+        setSyncMessage(
+          `Synced ${result.syncedTotal} pending item${result.syncedTotal === 1 ? '' : 's'}.`
+        );
+      } else {
+        setSyncMessage('Everything is already up to date.');
+      }
+    } catch (err) {
+      setSyncMessage(err?.message || 'We could not sync right now.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleTimeChange = (event, selectedDate) => {
     if (Platform.OS !== 'ios') setShowTimePicker(false);
     if (event?.type === 'dismissed') return;
@@ -189,7 +226,11 @@ export default function SettingsScreen() {
 
   return (
     <SafeScreen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'android' ? 'on-drag' : 'interactive'}
+      >
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
@@ -204,10 +245,27 @@ export default function SettingsScreen() {
           <Button variant="outline" style={styles.cardButton} onPress={handleSignOut}>
             Sign out
           </Button>
+          <Button
+            variant="ghost"
+            style={styles.cardButton}
+            onPress={handleManualSync}
+            loading={syncing}
+          >
+            Sync now
+          </Button>
           <Button variant="ghost" style={styles.cardButton} onPress={handlePasswordReset}>
             Reset password
           </Button>
+          <Button
+            variant="ghost"
+            style={styles.deleteButton}
+            onPress={confirmDelete}
+            loading={deleting}
+          >
+            Delete account
+          </Button>
           {resetMessage ? <Caption style={styles.prefMessage}>{resetMessage}</Caption> : null}
+          {syncMessage ? <Caption style={styles.prefMessage}>{syncMessage}</Caption> : null}
         </Card>
 
         <Card style={styles.card}>

@@ -94,7 +94,7 @@ const CreateEntry = () => {
       setVoiceClips([]);
       setMode('text');
       router.replace('/(tabs)/journal');
-    } catch (err) {
+    } catch (_err) {
       // Fallback to offline queue if request fails
       await addPendingEntry({
         userId,
@@ -116,7 +116,11 @@ const CreateEntry = () => {
         style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'android' ? 'on-drag' : 'interactive'}
+        >
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}

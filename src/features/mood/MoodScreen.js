@@ -17,8 +17,8 @@ import {
   getCachedMoods,
   getPendingMoods,
   saveCachedMoods,
-  syncPendingMoods,
 } from "../../services/offlineMoods";
+import { syncOfflineData } from "../../services/offlineSync";
 import { markMoodLoggedToday } from "../../services/reminderNotifications";
 import theme from "../../theme";
 
@@ -60,7 +60,6 @@ export default function MoodScreen() {
   const queryClient = useQueryClient();
 
   const [pendingMoods, setPendingMoods] = useState([]);
-  const [pendingReady, setPendingReady] = useState(false);
   const [cachedMoods, setCachedMoods] = useState([]);
   const [cacheReady, setCacheReady] = useState(false);
 
@@ -84,7 +83,6 @@ export default function MoodScreen() {
     getPendingMoods(userId).then((items) => {
       if (active) {
         setPendingMoods(items);
-        setPendingReady(true);
       }
     });
 
@@ -105,7 +103,7 @@ export default function MoodScreen() {
     let isActive = true;
 
     const runSync = async () => {
-      const result = await syncPendingMoods(userId);
+      const result = await syncOfflineData({ userId, queryClient });
       if (result?.synced && isActive) {
         queryClient.invalidateQueries(["moods", userId]);
         const items = await getPendingMoods(userId);
@@ -142,7 +140,7 @@ export default function MoodScreen() {
       const bDate = b.date || "";
       return bDate.localeCompare(aDate);
     });
-  }, [moods, pendingMoods]);
+  }, [moods, pendingMoods, cacheReady, cachedMoods]);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const todayEntry = useMemo(
@@ -152,13 +150,13 @@ export default function MoodScreen() {
 
   useEffect(() => {
     if (hasInit.current) return;
-    if (isLoading || !pendingReady || !cacheReady) return;
+    if (isLoading || !cacheReady) return;
     if (todayEntry) {
       setValue(todayEntry.value);
       setNote(todayEntry.note || "");
     }
     hasInit.current = true;
-  }, [todayEntry, isLoading, pendingReady, cacheReady]);
+  }, [todayEntry, isLoading, cacheReady]);
 
   const handleSave = async () => {
     setError("");
@@ -218,7 +216,7 @@ export default function MoodScreen() {
         </Body>
 
         <Card style={styles.card}>
-          <CardTitle style={styles.cardTitle}>Today's mood</CardTitle>
+          <CardTitle style={styles.cardTitle}>Today&apos;s mood</CardTitle>
           <MoodSelector value={value} onChange={setValue} />
           {value ? (
             <Caption style={styles.moodLabel}>

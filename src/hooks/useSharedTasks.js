@@ -8,7 +8,7 @@ import {
 
 export const useSharedTasks = ({ spaceId, userId }) => {
   return useQuery({
-    queryKey: ['shared-tasks', spaceId],
+    queryKey: ['shared-tasks', spaceId, userId],
     queryFn: () => getSharedTasks({ spaceId, userId }),
     enabled: !!spaceId && !!userId,
   });
@@ -19,7 +19,7 @@ export const useAddSharedTask = ({ spaceId, userId }) => {
   return useMutation({
     mutationFn: (payload) => addSharedTask({ spaceId, userId, payload }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['shared-tasks', spaceId]);
+      queryClient.invalidateQueries(['shared-tasks', spaceId, userId]);
     },
   });
 };
@@ -29,7 +29,7 @@ export const useUpdateSharedTask = ({ spaceId, userId }) => {
   return useMutation({
     mutationFn: ({ taskId, payload }) => updateSharedTask({ taskId, userId, payload }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['shared-tasks', spaceId]);
+      queryClient.invalidateQueries(['shared-tasks', spaceId, userId]);
     },
   });
 };
@@ -39,7 +39,7 @@ export const useDeleteSharedTask = ({ spaceId, userId }) => {
   return useMutation({
     mutationFn: ({ taskId }) => deleteSharedTask({ taskId, userId }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['shared-tasks', spaceId]);
+      queryClient.invalidateQueries(['shared-tasks', spaceId, userId]);
     },
   });
 };

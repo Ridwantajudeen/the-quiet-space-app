@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
@@ -42,7 +42,7 @@ export default function JournalEntryScreen() {
   const userId = user?.id;
   const queryClient = useQueryClient();
   const { data = [] } = useJournal(userId);
-  const { mutateAsync: updateEntry, isPending } = useUpdateJournalEntry(userId);
+  const { mutateAsync: updateEntry } = useUpdateJournalEntry(userId);
   const [pendingEntries, setPendingEntries] = useState([]);
   const [pendingUpdates, setPendingUpdates] = useState([]);
   const [text, setText] = useState('');
@@ -123,7 +123,7 @@ export default function JournalEntryScreen() {
       voiceUrls: entry.voice_urls || [],
       voiceLocalUris: entry.voice_local_uris || [],
     });
-  }, [entry?.id]);
+  }, [entry]);
 
   const handleSave = async () => {
     if (!userId || !entry) return;
@@ -207,7 +207,11 @@ export default function JournalEntryScreen() {
   if (!entry) {
     return (
       <SafeScreen>
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'android' ? 'on-drag' : 'interactive'}
+        >
           <View style={styles.headerRow}>
             <TouchableOpacity
               style={styles.backButton}
@@ -227,7 +231,11 @@ export default function JournalEntryScreen() {
 
   return (
     <SafeScreen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'android' ? 'on-drag' : 'interactive'}
+      >
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
@@ -286,6 +294,7 @@ export default function JournalEntryScreen() {
               value={text}
               onChangeText={setText}
               multiline
+              contextMenuHidden={false}
               autoFocus
               placeholder="Write what's on your mind..."
               placeholderTextColor={colors.textMuted}

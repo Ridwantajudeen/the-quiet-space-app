@@ -94,7 +94,12 @@ export default function CreateTaskScreen() {
     if (!isOnline) {
       const pending = await addPendingTask({ userId, ...payload });
       if (remindAt) {
-        await scheduleTaskReminder({ taskId: pending.id, title: pending.title, remindAt });
+        await scheduleTaskReminder({
+          taskId: pending.id,
+          title: pending.title,
+          remindAt,
+          prompt: true,
+        });
       }
       queryClient.invalidateQueries(['tasks', userId]);
       router.replace('/(tabs)/planner');
@@ -104,14 +109,24 @@ export default function CreateTaskScreen() {
     try {
       const created = await mutateAsync(payload);
       if (created?.id && remindAt) {
-        await scheduleTaskReminder({ taskId: created.id, title: created.title, remindAt });
+        await scheduleTaskReminder({
+          taskId: created.id,
+          title: created.title,
+          remindAt,
+          prompt: true,
+        });
       }
       queryClient.invalidateQueries(['tasks', userId]);
       router.replace('/(tabs)/planner');
     } catch (_) {
       const pending = await addPendingTask({ userId, ...payload });
       if (remindAt) {
-        await scheduleTaskReminder({ taskId: pending.id, title: pending.title, remindAt });
+        await scheduleTaskReminder({
+          taskId: pending.id,
+          title: pending.title,
+          remindAt,
+          prompt: true,
+        });
       }
       queryClient.invalidateQueries(['tasks', userId]);
       router.replace('/(tabs)/planner');

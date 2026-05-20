@@ -1,4 +1,4 @@
-﻿// src/features/insights/InsightsScreen.js
+// src/features/insights/InsightsScreen.js
 // Basic mood trends - last 7 days bar chart + summary
 //
 // Shows:
@@ -20,8 +20,8 @@ import {
   getCachedMoods,
   getPendingMoods,
   saveCachedMoods,
-  syncPendingMoods,
 } from "../../services/offlineMoods";
+import { syncOfflineData } from "../../services/offlineSync";
 import SafeScreen from "../../components/SafeScreen";
 import { Heading, Body, BodySmall, Caption, CardTitle } from "../../components/Typography";
 import Card from "../../components/Card";
@@ -41,7 +41,6 @@ const InsightsScreen = () => {
   const [pendingMoods, setPendingMoods] = useState([]);
   const [cachedMoods, setCachedMoods] = useState([]);
   const [cacheReady, setCacheReady] = useState(false);
-  const [pendingReady, setPendingReady] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -57,7 +56,6 @@ const InsightsScreen = () => {
     getPendingMoods(userId).then((items) => {
       if (active) {
         setPendingMoods(items);
-        setPendingReady(true);
       }
     });
 
@@ -79,7 +77,7 @@ const InsightsScreen = () => {
     let active = true;
 
     const runSync = async () => {
-      const result = await syncPendingMoods(userId);
+      const result = await syncOfflineData({ userId, queryClient });
       if (result?.synced && active) {
         queryClient.invalidateQueries(["moods", userId]);
         const items = await getPendingMoods(userId);
@@ -158,7 +156,7 @@ const InsightsScreen = () => {
 
 
   return (
-    <SafeScreen>
+    <SafeScreen dismissKeyboard={false}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>

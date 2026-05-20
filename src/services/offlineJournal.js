@@ -2,10 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system';
 import { apiRequest } from './api';
+import { authorizedFetch } from './authSession';
 
 const STORAGE_KEY = 'journal_pending_v1';
 const UPDATES_KEY = 'journal_updates_v1';
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://the-quiet-space-backend.onrender.com';
 
 const deleteLocalVoiceFile = async (uri) => {
   if (!uri) return;
@@ -30,7 +31,7 @@ export const uploadVoiceLocalFile = async ({ userId, localUri }) => {
     formData.append('userId', userId);
   }
 
-  const response = await fetch(`${API_URL}/uploads/voice`, {
+  const response = await authorizedFetch(`${API_URL}/uploads/voice`, {
     method: 'POST',
     body: formData,
   });

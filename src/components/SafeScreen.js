@@ -1,5 +1,5 @@
 import React from 'react';
-import { Keyboard, StyleSheet, View } from 'react-native';
+import { Keyboard, Platform, StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import theme from '../theme';
@@ -13,14 +13,17 @@ const SafeScreen = ({
   edges = ['top', 'left', 'right'],
   dismissKeyboard = true,
 }) => {
+  const content = <View style={[styles.content, contentStyle]}>{children}</View>;
+
   return (
     <SafeAreaView style={[styles.safe, style]} edges={edges}>
-      <View
-        style={[styles.content, contentStyle]}
-        onTouchStart={dismissKeyboard ? Keyboard.dismiss : undefined}
-      >
-        {children}
-      </View>
+      {Platform.OS === 'ios' && dismissKeyboard ? (
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          {content}
+        </TouchableWithoutFeedback>
+      ) : (
+        content
+      )}
     </SafeAreaView>
   );
 };

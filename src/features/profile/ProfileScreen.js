@@ -29,9 +29,10 @@ export default function ProfileScreen() {
   const lastName = profile?.last_name || user?.lastName || '';
   const email = profile?.email || user?.email || '';
   const avatarUrl = profile?.avatar_url || user?.avatarUrl || null;
+  const isPremium = !!(profile?.is_premium ?? user?.isPremium);
 
   return (
-    <SafeScreen>
+    <SafeScreen dismissKeyboard={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <Heading style={styles.title}>Profile</Heading>
         <Body muted style={styles.subtitle}>Your space, your pace.</Body>
@@ -46,7 +47,15 @@ export default function ProfileScreen() {
               )}
             </View>
             <View style={styles.profileInfo}>
-              <CardTitle>{`${firstName} ${lastName}`.trim() || 'Your name'}</CardTitle>
+              <View style={styles.nameRow}>
+                <CardTitle>{`${firstName} ${lastName}`.trim() || 'Your name'}</CardTitle>
+                {isPremium && (
+                  <View style={styles.premiumPill}>
+                    <Ionicons name="checkmark-circle" size={12} color={colors.primaryDark} />
+                    <Caption style={styles.premiumText}>Premium</Caption>
+                  </View>
+                )}
+              </View>
               <Caption style={styles.email}>{email || 'Email not set'}</Caption>
             </View>
           </View>
@@ -57,12 +66,15 @@ export default function ProfileScreen() {
           >
             Edit profile
           </Button>
+          <Body muted style={styles.inlineNote}>
+            {isPremium ? 'Premium is active on this account.' : 'Monthly Premium is ready from the app.'}
+          </Body>
         </Card>
 
         <Card style={styles.card}>
           <CardTitle style={styles.cardTitle}>Settings</CardTitle>
           <Body muted style={styles.caption}>
-            Manage reminders, account preferences, and privacy.
+            Manage reminders, account preferences, privacy, and premium.
           </Body>
           <Button
             variant="outline"
@@ -71,6 +83,16 @@ export default function ProfileScreen() {
           >
             Open settings
           </Button>
+          <Button
+            variant="ghost"
+            style={styles.cardButton}
+            onPress={() => router.push('/premium')}
+          >
+            View Premium
+          </Button>
+          <Body muted style={styles.inlineNote}>
+            Monthly Premium is ready when you want it.
+          </Body>
         </Card>
 
         <View style={styles.footer}>
@@ -121,6 +143,25 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  premiumPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: spacing.radius.full,
+    backgroundColor: colors.primaryLight,
+  },
+  premiumText: {
+    color: colors.primaryDark,
+    fontFamily: 'DMSans_500Medium',
+  },
   email: {
     color: colors.textMuted,
     marginTop: spacing.xs,
@@ -132,8 +173,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
-  cardButton: {
+  inlineNote: {
     marginTop: spacing.xs,
+    color: colors.textMuted,
   },
   footer: {
     alignItems: 'center',

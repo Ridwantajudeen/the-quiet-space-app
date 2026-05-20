@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import NetInfo from '@react-native-community/netinfo';
@@ -9,11 +9,11 @@ import { useRouter } from 'expo-router';
 import SafeScreen from '../../components/SafeScreen';
 import { Body, Caption, CardTitle, Heading } from '../../components/Typography';
 import Card from '../../components/Card';
-import Button from '../../components/Button';
 import theme from '../../theme';
 import { useUser } from '../../hooks/useUser';
 import { useDeleteTask, useTasks, useUpdateTask } from '../../hooks/useTasks';
-import { getPendingTasks, removePendingTask, syncPendingTasks } from '../../services/offlineTasks';
+import { getPendingTasks, removePendingTask } from '../../services/offlineTasks';
+import { syncOfflineData } from '../../services/offlineSync';
 import {
   cancelTaskReminder,
   scheduleTaskReminder,
@@ -81,27 +81,26 @@ export default function PlannerScreen() {
   const [showCompleted, setShowCompleted] = useState(true);
   const [selectedDate, setSelectedDate] = useState(todayString());
 
-  const loadPending = async () => {
+  const loadPending = useCallback(async () => {
     if (!userId) return;
     const pending = await getPendingTasks(userId);
     setPendingTasks(pending);
-  };
+  }, [userId]);
 
   useEffect(() => {
     loadPending();
-  }, [userId]);
+  }, [loadPending]);
 
   useEffect(() => {
     if (!userId) return;
     const unsubscribe = NetInfo.addEventListener(async (state) => {
       if (state.isConnected) {
-        await syncPendingTasks(userId);
+        await syncOfflineData({ userId, queryClient });
         await loadPending();
-        queryClient.invalidateQueries(['tasks', userId]);
       }
     });
     return unsubscribe;
-  }, [userId]);
+  }, [userId, loadPending, queryClient]);
 
   useEffect(() => {
     if (data?.length) {
@@ -219,6 +218,7 @@ export default function PlannerScreen() {
           taskId: task.id,
           title: task.title,
           remindAt: task.remind_at,
+          prompt: true,
         });
       }
     } catch (_) {
@@ -306,24 +306,6 @@ export default function PlannerScreen() {
         ))}
       </View>
 
-      <Card style={styles.sharedCard}>
-        <View style={styles.sharedRow}>
-          <View style={styles.sharedText}>
-            <CardTitle>Shared space</CardTitle>
-            <Caption style={styles.sharedCaption}>
-              Keep shared errands and plans in one gentle place.
-            </Caption>
-          </View>
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={() => router.push('/(tabs)/planner/shared')}
-          >
-            Open
-          </Button>
-        </View>
-      </Card>
-
       <TouchableOpacity
         style={styles.completedToggle}
         onPress={() => setShowCompleted((prev) => !prev)}
@@ -373,8 +355,9 @@ export default function PlannerScreen() {
   );
 
   return (
-    <SafeScreen contentStyle={styles.screen}>
+    <SafeScreen contentStyle={styles.screen} dismissKeyboard={false}>
       <SectionList
+        style={styles.listRoot}
         sections={sections}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={listHeader}
@@ -436,6 +419,9 @@ export default function PlannerScreen() {
 const styles = StyleSheet.create({
   screen: {
     paddingTop: spacing.xl,
+  },
+  listRoot: {
+    flex: 1,
   },
   headerRow: {
     flexDirection: 'row',
@@ -519,22 +505,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: spacing.lg,
-  },
-  sharedCard: {
-    marginBottom: spacing.md,
-  },
-  sharedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.base,
-  },
-  sharedText: {
-    flex: 1,
-  },
-  sharedCaption: {
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
   },
   taskCard: {
     marginBottom: spacing.md,

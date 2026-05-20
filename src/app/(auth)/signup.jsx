@@ -51,7 +51,7 @@ export default function SignupScreen() {
     if (!password) {
       next.password = 'Create a password to keep things safe.';
     } else if (password.length < 8) {
-      next.password = 'Let’s use at least 8 characters.';
+      next.password = "Let's use at least 8 characters.";
     } else if (!/[A-Z]/.test(password)) {
       next.password = 'Add one uppercase letter for a little extra strength.';
     } else if (!/[0-9]/.test(password)) {
@@ -60,7 +60,7 @@ export default function SignupScreen() {
     if (!confirmPassword) {
       next.confirmPassword = 'Please re-enter your password.';
     } else if (password && confirmPassword !== password) {
-      next.confirmPassword = 'Passwords don’t match yet—take a breath and try again.';
+      next.confirmPassword = "Passwords don't match yet. Take a breath and try again.";
     }
 
     setErrors(next);
@@ -73,13 +73,15 @@ export default function SignupScreen() {
     try {
       const result = await signup({ firstName, lastName, email, password });
       if (result?.user) {
-        setUser({ ...result.user, token: result.token || null });
+        setUser({
+          ...result.user,
+          token: result.token || null,
+          refreshToken: result.refreshToken || null,
+        });
       }
       router.replace('/(tabs)');
     } catch (err) {
-      const message =
-        err?.message ||
-        'We couldn’t create your account just yet. Please try again.';
+      const message = err?.message || "We couldn't create your account just yet. Please try again.";
       if (message.toLowerCase().includes('already in use')) {
         setErrors((prev) => ({ ...prev, email: message }));
       } else {
@@ -190,10 +192,7 @@ export default function SignupScreen() {
 
         <View style={styles.footer}>
           <Caption>Already have an account?</Caption>
-          <Button
-            variant="ghost"
-            onPress={() => router.back()}
-          >
+          <Button variant="ghost" onPress={() => router.back()}>
             Sign in
           </Button>
         </View>

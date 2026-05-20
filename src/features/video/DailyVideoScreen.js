@@ -94,15 +94,15 @@ export default function DailyVideoScreen() {
       <Card style={styles.card}>
         <CardTitle style={styles.cardTitle}>Latest reset</CardTitle>
         {isLoading && <Body muted>Loading your reset...</Body>}
-        {isError && !isLoading && <Body muted>We could not load today's reset.</Body>}
+        {isError && !isLoading && <Body muted>We could not load today&apos;s reset.</Body>}
         {!isLoading && !isError && !video && (
           <Body muted>No reset video yet. Check back later today.</Body>
         )}
         {!isLoading && !isError && video && isLocked && (
           <View>
             <Body muted>This reset is part of Calm Plus.</Body>
-            <Button variant="outline" style={styles.lockButton} onPress={() => {}}>
-              Premium coming soon
+            <Button variant="outline" style={styles.lockButton} onPress={() => router.push('/premium')}>
+              Upgrade to Premium
             </Button>
           </View>
         )}

@@ -1,6 +1,7 @@
 import { apiRequest } from '../../services/api';
+import { authorizedFetch } from '../../services/authSession';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://the-quiet-space-backend.onrender.com';
 
 export const getProfile = async (userId) => {
   return apiRequest(`/profile?userId=${encodeURIComponent(userId)}`);
@@ -27,7 +28,7 @@ export const uploadAvatar = async ({ userId, uri }) => {
     formData.append('userId', userId);
   }
 
-  const response = await fetch(`${API_URL}/uploads/profile`, {
+  const response = await authorizedFetch(`${API_URL}/uploads/profile`, {
     method: 'POST',
     body: formData,
   });

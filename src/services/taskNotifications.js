@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Alert, Platform } from 'react-native';
+import {
+  clearNotificationPromptSuppression,
+  shouldSuppressNotificationPrompts,
+  suppressNotificationPrompts,
+} from './notificationPromptState';
 
 const STORAGE_KEY = 'task_notification_map_v1';
 
@@ -26,16 +31,49 @@ const confirmPermission = (message) =>
     ]);
   });
 
-export const ensureTaskNotificationsReady = async () => {
+export const ensureTaskNotificationsReady = async ({ prompt = false } = {}) => {
   const current = await Notifications.getPermissionsAsync();
-  if (current.status !== 'granted') {
-    const allow = await confirmPermission(
-      'We use notifications to remind you about tasks you schedule.'
-    );
-    if (!allow) return false;
+  if (current.status === 'granted') {
+    await clearNotificationPromptSuppression();
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('tasks', {
+        name: 'Tasks',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#D8A7B1',
+      });
+    }
+    return true;
+  }
+
+  if (current.status === 'denied') {
+    await suppressNotificationPrompts();
+    return false;
+  }
+
+  if (current.status !== 'undetermined' || !prompt) {
+    return false;
+  }
+
+  const suppressed = await shouldSuppressNotificationPrompts();
+  if (suppressed) {
+    return false;
+  }
+
+  const allow = await confirmPermission(
+    'We use notifications to remind you about tasks you schedule.'
+  );
+  if (!allow) {
+    await suppressNotificationPrompts();
+    return false;
   }
 
   const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    await suppressNotificationPrompts();
+    return false;
+  }
+  await clearNotificationPromptSuppression();
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('tasks', {
       name: 'Tasks',
@@ -44,16 +82,16 @@ export const ensureTaskNotificationsReady = async () => {
       lightColor: '#D8A7B1',
     });
   }
-  return status === 'granted';
+  return true;
 };
 
-export const scheduleTaskReminder = async ({ taskId, title, remindAt }) => {
+export const scheduleTaskReminder = async ({ taskId, title, remindAt, prompt = false }) => {
   if (!remindAt) return null;
   const triggerAt = new Date(remindAt);
   if (Number.isNaN(triggerAt.getTime())) return null;
   if (triggerAt <= new Date()) return null;
 
-  const hasPermission = await ensureTaskNotificationsReady();
+  const hasPermission = await ensureTaskNotificationsReady({ prompt });
   if (!hasPermission) return null;
 
   const map = await loadMap();

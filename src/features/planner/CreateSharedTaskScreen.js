@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import Card from '../../components/Card';
 import Input from '../../components/Input';
 import theme from '../../theme';
 import { useUser } from '../../hooks/useUser';
+import { useSharedSpaces, useSharedSpaceMembers } from '../../hooks/useSharedSpaces';
 import { useAddSharedTask } from '../../hooks/useSharedTasks';
 
 const { colors, spacing } = theme;
@@ -38,7 +39,16 @@ export default function CreateSharedTaskScreen() {
   const queryClient = useQueryClient();
   const { user } = useUser();
   const userId = user?.id;
-  const { mutateAsync, isPending } = useAddSharedTask({ spaceId, userId });
+  const { data: spaces = [] } = useSharedSpaces(userId);
+  const currentSpace = useMemo(() => {
+    if (!spaces.length) return null;
+    return spaces.find((space) => space.id === spaceId) || spaces[0];
+  }, [spaces, spaceId]);
+  const { data: members = [] } = useSharedSpaceMembers({
+    spaceId: currentSpace?.id,
+    userId,
+  });
+  const { mutateAsync, isPending } = useAddSharedTask({ spaceId: currentSpace?.id, userId });
 
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
@@ -49,6 +59,8 @@ export default function CreateSharedTaskScreen() {
   const [tempDate, setTempDate] = useState(new Date());
   const [tempTime, setTempTime] = useState(new Date());
   const [error, setError] = useState('');
+  const [assignmentMode, setAssignmentMode] = useState('all');
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
 
   useEffect(() => {
     setTitle('');
@@ -58,11 +70,29 @@ export default function CreateSharedTaskScreen() {
     setError('');
     setTempDate(new Date());
     setTempTime(new Date());
+    setAssignmentMode('all');
+    setSelectedMemberId(null);
   }, []);
+
+  useEffect(() => {
+    if (!members.length) {
+      setSelectedMemberId(null);
+      return;
+    }
+    if (assignmentMode === 'one' && !selectedMemberId) {
+      const defaultMember = members.find((member) => member.isMe) || members[0];
+      setSelectedMemberId(defaultMember?.user_id || null);
+    }
+  }, [members, assignmentMode, selectedMemberId]);
 
   const handleSave = async () => {
     if (!title.trim()) {
       setError('Add a short title so it is easy to remember.');
+      return;
+    }
+
+    if (assignmentMode === 'one' && !selectedMemberId) {
+      setError('Choose who this task is for, or switch to everyone.');
       return;
     }
 
@@ -85,12 +115,17 @@ export default function CreateSharedTaskScreen() {
       dueDate,
       dueTime,
       remindAt,
+      assignToAll: assignmentMode === 'all',
+      assignedToUserId: assignmentMode === 'one' ? selectedMemberId : null,
     };
 
     try {
       await mutateAsync(payload);
-      queryClient.invalidateQueries(['shared-tasks', spaceId]);
-      router.replace('/(tabs)/planner/shared');
+      queryClient.invalidateQueries(['shared-tasks', currentSpace?.id, userId]);
+      router.replace({
+        pathname: '/(tabs)/planner/shared-space',
+        params: { spaceId: currentSpace?.id },
+      });
     } catch (err) {
       setError(err?.message || 'We could not save that task yet.');
     }
@@ -105,14 +140,19 @@ export default function CreateSharedTaskScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.replace('/(tabs)/planner/shared')}
+            onPress={() =>
+              router.replace({
+                pathname: '/(tabs)/planner/shared-space',
+                params: { spaceId },
+              })
+            }
           >
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <Heading style={styles.title}>Shared task</Heading>
         </View>
         <Body muted style={styles.subtitle}>
-          Everyone in the shared space will see this task.
+          Everyone in the shared space can see this task, but you can assign it to one person if you want.
         </Body>
 
         <Card style={styles.card}>
@@ -135,15 +175,76 @@ export default function CreateSharedTaskScreen() {
             numberOfLines={3}
           />
 
+          <View style={styles.assignmentCard}>
+            <Caption style={styles.assignmentLabel}>Assign to</Caption>
+            <View style={styles.assignmentRow}>
+              <TouchableOpacity
+                style={[
+                  styles.assignmentPill,
+                  assignmentMode === 'all' && styles.assignmentPillActive,
+                ]}
+                onPress={() => setAssignmentMode('all')}
+              >
+                <Caption
+                  style={[
+                    styles.assignmentPillText,
+                    assignmentMode === 'all' && styles.assignmentPillTextActive,
+                  ]}
+                >
+                  Everyone
+                </Caption>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.assignmentPill,
+                  assignmentMode === 'one' && styles.assignmentPillActive,
+                ]}
+                onPress={() => setAssignmentMode('one')}
+              >
+                <Caption
+                  style={[
+                    styles.assignmentPillText,
+                    assignmentMode === 'one' && styles.assignmentPillTextActive,
+                  ]}
+                >
+                  One person
+                </Caption>
+              </TouchableOpacity>
+            </View>
+
+            {assignmentMode === 'one' && (
+              <View style={styles.memberWrap}>
+                {members.map((member) => {
+                  const label =
+                    `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email;
+                  const active = selectedMemberId === member.user_id;
+                  return (
+                    <TouchableOpacity
+                      key={member.id}
+                      style={[styles.memberPill, active && styles.memberPillActive]}
+                      onPress={() => setSelectedMemberId(member.user_id)}
+                    >
+                      <Caption style={[styles.memberText, active && styles.memberTextActive]}>
+                        {label}
+                        {member.isMe ? ' (You)' : ''}
+                      </Caption>
+                    </TouchableOpacity>
+                  );
+                })}
+                {!members.length && <Caption style={styles.helper}>No members found yet.</Caption>}
+              </View>
+            )}
+          </View>
+
           <View style={styles.row}>
             <View style={styles.rowItem}>
               <Caption>Date</Caption>
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => {
-                  setTempDate(date);
-                  setShowDatePicker(true);
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => {
+                setTempDate(date);
+                setShowDatePicker(true);
                 }}
               >
                 {formatDate(date)}
@@ -294,6 +395,63 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: spacing.lg,
+  },
+  assignmentCard: {
+    marginBottom: spacing.base,
+  },
+  assignmentLabel: {
+    marginBottom: spacing.xs,
+    color: colors.textMuted,
+  },
+  assignmentRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  assignmentPill: {
+    paddingVertical: 8,
+    paddingHorizontal: spacing.base,
+    borderRadius: spacing.radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  assignmentPillActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  assignmentPillText: {
+    color: colors.textSecondary,
+  },
+  assignmentPillTextActive: {
+    color: colors.primaryDark,
+  },
+  memberWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  memberPill: {
+    paddingVertical: 8,
+    paddingHorizontal: spacing.base,
+    borderRadius: spacing.radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  memberPillActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  memberText: {
+    color: colors.textSecondary,
+  },
+  memberTextActive: {
+    color: colors.primaryDark,
+  },
+  helper: {
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   error: {
     color: colors.error,

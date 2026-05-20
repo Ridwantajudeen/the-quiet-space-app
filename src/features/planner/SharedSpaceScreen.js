@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -10,7 +10,14 @@ import Input from '../../components/Input';
 import Button from '../../components/Button';
 import theme from '../../theme';
 import { useUser } from '../../hooks/useUser';
-import { useSharedSpaces, useCreateSharedSpace, useInviteSharedMember } from '../../hooks/useSharedSpaces';
+import {
+  useSharedSpaces,
+  useInviteSharedMember,
+  useSharedSpaceMembers,
+  useRemoveSharedSpaceMember,
+  useLeaveSharedSpace,
+  useDeleteSharedSpace,
+} from '../../hooks/useSharedSpaces';
 import { useSharedTasks, useUpdateSharedTask, useDeleteSharedTask } from '../../hooks/useSharedTasks';
 
 const { colors, spacing } = theme;
@@ -33,6 +40,7 @@ export default function SharedSpaceScreen() {
   const params = useLocalSearchParams();
   const { user } = useUser();
   const userId = user?.id;
+  const isPremium = !!user?.isPremium;
 
   const { data: spaces = [] } = useSharedSpaces(userId);
   const initialId = typeof params?.spaceId === 'string' ? params.spaceId : null;
@@ -46,13 +54,35 @@ export default function SharedSpaceScreen() {
     }
     return spaces[0];
   }, [spaces, selectedSpaceId]);
+  useEffect(() => {
+    if (!spaces.length) {
+      setSelectedSpaceId(null);
+      return;
+    }
+    if (selectedSpaceId && !spaces.some((space) => space.id === selectedSpaceId)) {
+      setSelectedSpaceId(spaces[0].id);
+    }
+  }, [spaces, selectedSpaceId]);
+  const currentRole = currentSpace?.role || null;
+  const canManageCurrentSpace = currentRole === 'owner';
+  const freeSpaceLimitReached = !isPremium && spaces.length >= 2;
+  const {
+    data: members = [],
+    isLoading: membersLoading,
+    isError: membersError,
+  } = useSharedSpaceMembers({
+    spaceId: currentSpace?.id,
+    userId,
+  });
 
   const { data: sharedTasks = [], isLoading, isError } = useSharedTasks({
     spaceId: currentSpace?.id,
     userId,
   });
-  const { mutateAsync: createSpace, isPending: creating } = useCreateSharedSpace(userId);
   const { mutateAsync: inviteMember, isPending: inviting } = useInviteSharedMember(userId);
+  const { mutateAsync: removeMember, isPending: removingMember } = useRemoveSharedSpaceMember(userId);
+  const { mutateAsync: leaveSpace, isPending: leavingSpace } = useLeaveSharedSpace(userId);
+  const { mutateAsync: deleteSpace, isPending: deletingSpace } = useDeleteSharedSpace(userId);
   const { mutateAsync: updateTask } = useUpdateSharedTask({
     spaceId: currentSpace?.id,
     userId,
@@ -62,29 +92,8 @@ export default function SharedSpaceScreen() {
     userId,
   });
 
-  const [spaceName, setSpaceName] = useState('Shared Space');
   const [inviteEmail, setInviteEmail] = useState('');
   const [status, setStatus] = useState('');
-
-  const handleCreateSpace = async () => {
-    if (!userId) return;
-    setStatus('');
-    if (!spaceName.trim()) {
-      setStatus('Give your shared space a name.');
-      return;
-    }
-    try {
-      const space = await createSpace({ name: spaceName.trim() });
-      setSelectedSpaceId(space.id);
-      setStatus('Shared space created.');
-      if (inviteEmail.trim()) {
-        await inviteMember({ spaceId: space.id, email: inviteEmail.trim() });
-        setStatus('Shared space created and invite sent.');
-      }
-    } catch (err) {
-      setStatus(err?.message || 'We could not create the shared space yet.');
-    }
-  };
 
   const handleInvite = async () => {
     if (!currentSpace?.id) return;
@@ -127,6 +136,69 @@ export default function SharedSpaceScreen() {
     ]);
   };
 
+  const handleRemoveMember = (member) => {
+    Alert.alert(
+      'Remove member?',
+      'This will remove them from the shared space for everyone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeMember({ spaceId: currentSpace.id, memberId: member.user_id });
+            } catch (err) {
+              setStatus(err?.message || 'We could not remove that member just now.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLeaveSpace = () => {
+    if (!currentSpace?.id) return;
+    Alert.alert('Leave shared space?', 'You will no longer see tasks from this space.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await leaveSpace({ spaceId: currentSpace.id });
+            setStatus('You left the shared space.');
+          } catch (err) {
+            setStatus(err?.message || 'We could not leave this space just yet.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteSpace = () => {
+    if (!currentSpace?.id) return;
+    Alert.alert(
+      'Delete shared space?',
+      'This removes everyone and all tasks in this shared space.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteSpace({ spaceId: currentSpace.id });
+              setStatus('Shared space deleted.');
+            } catch (err) {
+              setStatus(err?.message || 'We could not delete this space just now.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const sections = useMemo(() => {
     const upcoming = sharedTasks.filter((task) => !task.is_done);
     const completed = sharedTasks.filter((task) => task.is_done);
@@ -137,8 +209,9 @@ export default function SharedSpaceScreen() {
   }, [sharedTasks]);
 
   return (
-    <SafeScreen contentStyle={styles.screen}>
+    <SafeScreen contentStyle={styles.screen} dismissKeyboard={false}>
       <SectionList
+        style={styles.listRoot}
         sections={sections}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -155,6 +228,29 @@ export default function SharedSpaceScreen() {
               Tasks here show up for everyone you invite.
             </Body>
 
+            <Card style={styles.card}>
+              <CardTitle>Shared spaces</CardTitle>
+              <Body muted style={styles.cardBody}>
+                Keep tasks in one calm place for the people who help you carry them.
+              </Body>
+              <Button
+                style={styles.actionButton}
+                onPress={() => router.push('/(tabs)/planner/shared-space-create')}
+              >
+                Create shared space
+              </Button>
+              {!isPremium && (
+                <Caption style={styles.noticeText}>
+                  Creating a space is part of premium. Free users can join up to 2 spaces when invited.
+                </Caption>
+              )}
+              {!isPremium && freeSpaceLimitReached && (
+                <Caption style={styles.noticeText}>
+                  You have reached your free shared space limit.
+                </Caption>
+              )}
+            </Card>
+
             {spaces.length > 0 && (
               <View style={styles.spaceTabs}>
                 {spaces.map((space) => (
@@ -166,45 +262,30 @@ export default function SharedSpaceScreen() {
                     ]}
                     onPress={() => setSelectedSpaceId(space.id)}
                   >
-                    <Caption
-                      style={
-                        currentSpace?.id === space.id
-                          ? styles.spacePillTextActive
-                          : styles.spacePillText
-                      }
-                    >
-                      {space.name}
-                    </Caption>
+                    <View style={styles.spacePillInner}>
+                      <Caption
+                        style={
+                          currentSpace?.id === space.id
+                            ? styles.spacePillTextActive
+                            : styles.spacePillText
+                        }
+                      >
+                        {space.name}
+                      </Caption>
+                      {space.role === 'owner' && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={14}
+                          color={colors.primaryDark}
+                        />
+                      )}
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
 
-            {spaces.length === 0 && (
-              <Card style={styles.card}>
-                <CardTitle>Create a shared space</CardTitle>
-                <Input
-                  label="Shared space name"
-                  placeholder="Home support"
-                  value={spaceName}
-                  onChangeText={setSpaceName}
-                />
-                <Input
-                  label="Invite email (optional)"
-                  placeholder="partner@example.com"
-                  value={inviteEmail}
-                  onChangeText={setInviteEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-                {status ? <Caption style={styles.status}>{status}</Caption> : null}
-                <Button onPress={handleCreateSpace} loading={creating}>
-                  Create shared space
-                </Button>
-              </Card>
-            )}
-
-            {spaces.length > 0 && currentSpace && (
+            {spaces.length > 0 && currentSpace && canManageCurrentSpace && (
               <Card style={styles.card}>
                 <CardTitle>Invite someone</CardTitle>
                 <Input
@@ -219,6 +300,80 @@ export default function SharedSpaceScreen() {
                 <Button onPress={handleInvite} loading={inviting}>
                   Send invite
                 </Button>
+                <Button
+                  variant="outline"
+                  style={styles.actionButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/planner/shared-create',
+                      params: { spaceId: currentSpace.id },
+                    })
+                  }
+                >
+                  Add shared task
+                </Button>
+              </Card>
+            )}
+
+            {spaces.length > 0 && currentSpace && !canManageCurrentSpace && (
+              <Card style={styles.card}>
+                <Body muted>
+                  Only the space owner can invite new members.
+                </Body>
+                <Button
+                  variant="outline"
+                  style={styles.actionButton}
+                  onPress={handleLeaveSpace}
+                  loading={leavingSpace}
+                >
+                  Leave space
+                </Button>
+              </Card>
+            )}
+
+            {spaces.length > 0 && currentSpace && (
+              <Card style={styles.card}>
+                <CardTitle>Members</CardTitle>
+                {membersLoading && <Body muted style={styles.memberNote}>Loading members...</Body>}
+                {membersError && (
+                  <Body muted style={styles.memberNote}>We could not load members right now.</Body>
+                )}
+                {!membersLoading && !membersError && members.length === 0 && (
+                  <Body muted style={styles.memberNote}>No members yet.</Body>
+                )}
+                {members.map((member) => (
+                  <View key={member.id} style={styles.memberRow}>
+                    <View style={styles.memberText}>
+                      <Body>
+                        {`${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email}
+                      </Body>
+                      <Caption style={styles.memberCaption}>
+                        {member.role === 'owner' ? 'Owner' : 'Member'}
+                        {member.isMe ? ' • You' : ''}
+                      </Caption>
+                    </View>
+                    {canManageCurrentSpace && !member.isMe && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => handleRemoveMember(member)}
+                        loading={removingMember}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </View>
+                ))}
+                {canManageCurrentSpace && (
+                  <Button
+                    variant="outline"
+                    style={styles.actionButton}
+                    onPress={handleDeleteSpace}
+                    loading={deletingSpace}
+                  >
+                    Delete space
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   style={styles.actionButton}
@@ -290,6 +445,9 @@ const styles = StyleSheet.create({
   screen: {
     paddingTop: spacing.xl,
   },
+  listRoot: {
+    flex: 1,
+  },
   list: {
     paddingBottom: spacing.lg,
   },
@@ -309,6 +467,13 @@ const styles = StyleSheet.create({
   subtitle: {
     marginBottom: spacing.lg,
   },
+  cardBody: {
+    marginBottom: spacing.sm,
+  },
+  noticeText: {
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
   card: {
     marginBottom: spacing.md,
   },
@@ -318,6 +483,26 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginTop: spacing.sm,
+  },
+  memberNote: {
+    marginTop: spacing.xs,
+    color: colors.textMuted,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  memberText: {
+    flex: 1,
+  },
+  memberCaption: {
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   spaceTabs: {
     flexDirection: 'row',
@@ -331,6 +516,11 @@ const styles = StyleSheet.create({
     borderRadius: spacing.radius.full,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  spacePillInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   spacePillActive: {
     backgroundColor: colors.primaryLight,
